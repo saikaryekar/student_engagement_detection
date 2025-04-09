@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real-Time Engagement Detection</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"/>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      background-color: #f8f9fa;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #343a40;
+      margin-bottom: 20px;
+    }
+    #processedFrame {
+      width: 640px;
+      height: 480px;
+      border: 5px solid #007bff;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    select {
+      padding: 6px 10px;
+      font-size: 16px;
+    }
+    #status {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    footer {
+      margin-top: 20px;
+      color: #6c757d;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Engagement Detection</h1>
+
+  <img id="processedFrame" alt="Processed Frame" />
+
+  <div class="controls">
+    <select id="cameraSelect"></select>
+    <button id="startBtn" class="btn btn-success">Start Tracking</button>
+    <button id="stopBtn" class="btn btn-danger" disabled>Stop Tracking</button>
+    <a href="/engagement_summary" class="btn btn-primary" target="_blank">View Summary</a>
+  </div>
+
+  <p id="status">Tracking not started</p>
+
+  <footer>
+    <p>&copy; 2025 Georgia Tech | Powered by Flask & MediaPipe</p>
+  </footer>
+
+  <script>
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const processedImage = document.getElementById("processedFrame");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const cameraSelect = document.getElementById("cameraSelect");
+    const statusText = document.getElementById("status");
+
+    let video;
+    let stream;
+    let tracking = false;
+    let frameBuffer = [];
+
+    async function populateCameraList() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      cameraSelect.innerHTML = "";
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    async function startCamera(deviceId) {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId } }
+      });
+
+      video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+    }
+
+    async function captureChunkFrames(duration = 5000, fps = 1) {
+      frameBuffer = [];
+      const interval = 1000 / fps;
+      const totalFrames = duration / interval;
+
+      for (let i = 0; i < totalFrames; i++) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.7);
+        });
+        frameBuffer.push(blob);
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+    }
+
+    async function sendFrames() {
+      const formData = new FormData();
+      frameBuffer.forEach((blob, idx) => {
+        formData.append(`frame_${idx}`, blob, `frame_${idx}.jpg`);
+      });
+
+      const res = await fetch('/process_frame_chunk', {
+        method: 'POST',
+        body: formData
+      });
+
+      const { annotated_frames } = await res.json();
+
+      for (const base64 of annotated_frames) {
+        processedImage.src = `data:image/jpeg;base64,${base64}`;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    startBtn.addEventListener("click", async () => {
+      tracking = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      statusText.innerText = "Tracking started...";
+      const selectedDeviceId = cameraSelect.value;
+      await startCamera(selectedDeviceId);
+
+      while (tracking) {
+        await captureChunkFrames(5000, 1);
+        await sendFrames();
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      tracking = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusText.innerText = "Tracking stopped.";
+      if (stream) stream.getTracks().forEach(track => track.stop());
+    });
+
+    navigator.mediaDevices.getUserMedia({ video: true }).then(() => {
+      populateCameraList();
+    });
+  </script>
+</body>
+</html>
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real-Time Engagement Detection</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"/>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      background-color: #f8f9fa;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      color: #343a40;
+      margin-bottom: 20px;
+    }
+    #processedFrame {
+      width: 640px;
+      height: 480px;
+      border: 5px solid #007bff;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    select {
+      padding: 6px 10px;
+      font-size: 16px;
+    }
+    #status {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    footer {
+      margin-top: 20px;
+      color: #6c757d;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Engagement Detection</h1>
+
+  <img id="processedFrame" alt="Processed Frame" />
+
+  <div class="controls">
+    <select id="cameraSelect"></select>
+    <button id="startBtn" class="btn btn-success">Start Tracking</button>
+    <button id="stopBtn" class="btn btn-danger" disabled>Stop Tracking</button>
+    <a href="/engagement_summary" class="btn btn-primary" target="_blank">View Summary</a>
+  </div>
+
+  <p id="status">Tracking not started</p>
+
+  <footer>
+    <p>&copy; 2025 Georgia Tech | Powered by Flask & MediaPipe</p>
+  </footer>
+
+  <script>
+    const processedImage = document.getElementById("processedFrame");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const statusText = document.getElementById("status");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const cameraSelect = document.getElementById("cameraSelect");
+
+    let trackingInterval;
+    let currentStream;
+    let video;
+
+    // Get list of cameras
+    async function populateCameraList() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      cameraSelect.innerHTML = "";
+
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+    }
+
+    // Start selected camera
+    async function startCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: { deviceId: { exact: deviceId } }
+      };
+
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video = document.createElement("video");
+      video.srcObject = currentStream;
+      await video.play();
+      return video;
+    }
+
+    // Start tracking
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      statusText.innerText = "Tracking started...";
+      statusText.style.color = "green";
+
+      const selectedDeviceId = cameraSelect.value;
+      video = await startCamera(selectedDeviceId);
+
+      trackingInterval = setInterval(() => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(blob => {
+          const formData = new FormData();
+          formData.append('frame', blob, 'frame.jpg');
+
+          fetch('/process_frame', {
+            method: 'POST',
+            body: formData
+          })
+          .then(res => res.blob())
+          .then(blob => {
+            const url = URL.createObjectURL(blob);
+            processedImage.src = url;
+          });
+        }, 'image/jpeg', 0.8);
+      }, 5000);
+    });
+
+    // Stop tracking
+    stopBtn.addEventListener("click", () => {
+      clearInterval(trackingInterval);
+      statusText.innerText = "Tracking stopped.";
+      statusText.style.color = "red";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+    });
+
+    // Populate camera list on page load
+    navigator.mediaDevices.getUserMedia({ video: true }).then(() => {
+      populateCameraList();
+    }).catch(err => {
+      console.error("Webcam access denied:", err);
+      statusText.innerText = "Webcam access denied!";
+      statusText.style.color = "red";
+    });
+  </script>
+</body>
+</html> -->

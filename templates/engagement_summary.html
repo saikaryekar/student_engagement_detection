@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engagement Summary</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            padding-bottom: 40px;
+        }
+        h1 {
+            color: #343a40;
+            margin-bottom: 20px;
+        }
+        .graph-container {
+            width: 80%;
+            max-width: 900px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+        .download-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .download-btn:hover {
+            background-color: #0056b3;
+        }
+        footer {
+            margin-top: 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Engagement Summary</h1>
+
+    <!-- Download Report Button at the Top -->
+    <button class="download-btn" onclick="downloadCSV()">Download Report (csv)</button>
+
+    <!-- Engagement Over Time -->
+    <div class="graph-container">
+        <h3>Engagement Over Time</h3>
+        <div id="timeGraph"></div>
+    </div>
+
+    <!-- Engagement Distribution Pie Chart -->
+    <div class="graph-container">
+        <h3>Engagement Distribution</h3>
+        <div id="pieChart"></div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Engagement AI | Powered by Flask & Plotly</p>
+    </footer>
+
+    <script>
+        let engagementData = [];
+        let perMinuteData = {};
+
+        fetch('/get_engagement_data')
+            .then(response => response.json())
+            .then(data => {
+                engagementData = data; // Store original data
+
+                const timestamps = data.map(item => new Date(item.timestamp));
+                const engagements = data.map(item => item.engagement === "High" ? 1 : 0);
+
+                // Aggregate per-minute data
+                perMinuteData = {};
+                for (let i = 0; i < timestamps.length; i++) {
+                    let minuteKey = timestamps[i].toISOString().substring(0, 16); // Format: YYYY-MM-DDTHH:MM
+                    if (!perMinuteData[minuteKey]) {
+                        perMinuteData[minuteKey] = { sum: 0, count: 0 };
+                    }
+                    perMinuteData[minuteKey].sum += engagements[i];
+                    perMinuteData[minuteKey].count += 1;
+                }
+
+                const aggregatedTimestamps = Object.keys(perMinuteData);
+                const aggregatedEngagements = aggregatedTimestamps.map(minute => 
+                    perMinuteData[minute].sum / perMinuteData[minute].count
+                );
+
+                // Engagement Over Time (Line Graph)
+                const timeTrace = {
+                    x: aggregatedTimestamps,
+                    y: aggregatedEngagements,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Avg Engagement per Minute',
+                    line: { color: '#007bff' },
+                    marker: { size: 6 }
+                };
+                Plotly.newPlot('timeGraph', [timeTrace], {
+                    title: 'Engagement Levels Over Time (Per Minute)',
+                    xaxis: { title: 'Timestamp' },
+                    yaxis: { title: 'Engagement Level', range: [0, 1] },
+                    plot_bgcolor: '#f8f9fa',
+                    paper_bgcolor: '#ffffff'
+                });
+
+                // Engagement Distribution (Pie Chart)
+                const highCount = engagements.filter(e => e === 1).length;
+                const lowCount = engagements.filter(e => e === 0).length;
+                const pieTrace = {
+                    values: [highCount, lowCount],
+                    labels: ['High Engagement', 'Low Engagement'],
+                    type: 'pie',
+                    marker: { colors: ['#28a745', '#dc3545'] }
+                };
+                Plotly.newPlot('pieChart', [pieTrace], {
+                    title: 'Engagement Distribution',
+                    paper_bgcolor: '#ffffff'
+                });
+            });
+
+        function downloadCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Timestamp,Avg Engagement\n";
+            for (const [minute, values] of Object.entries(perMinuteData)) {
+                let avgEngagement = (values.sum / values.count).toFixed(2);
+                csvContent += `${minute},${avgEngagement}\n`;
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "engagement_report_per_minute.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

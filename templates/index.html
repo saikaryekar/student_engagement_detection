@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Engagement Detection</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #343a40;
+            margin-bottom: 20px;
+        }
+        .content-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+        .video-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 5px solid #007bff;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            width: 640px;
+            height: 480px;
+            display: none; /* Initially hidden */
+            background-color: black;
+        }
+        img {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            justify-content: center;
+        }
+        .btn {
+            font-size: 1rem;
+            padding: 10px 20px;
+            transition: all 0.3s ease-in-out;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 18px;
+            color: #007bff;
+        }
+        footer {
+            margin-top: 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Engagement Detection</h1>
+
+    <div class="content-container">
+        <div class="controls">
+            <button id="startBtn" class="btn btn-success">Start Tracking</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>Stop Tracking</button>
+            <a href="/engagement_summary" class="btn btn-primary" target="_blank">View Summary</a>
+        </div>
+        <p id="status">Tracking not started</p>
+
+        <div class="video-container" id="videoContainer">
+            <img id="videoFeed" src="" alt="Live Engagement Detection">
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Georgia Tech | Powered by Flask & OpenCV</p>
+    </footer>
+
+    <script>
+        const startBtn = document.getElementById("startBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const statusText = document.getElementById("status");
+        const videoContainer = document.getElementById("videoContainer");
+        const videoFeed = document.getElementById("videoFeed");
+
+        startBtn.addEventListener("click", () => {
+            fetch('/toggle_tracking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track: true })
+            }).then(() => {
+                statusText.innerText = "Tracking started...";
+                statusText.style.color = "green";
+                videoContainer.style.display = "block"; // Show the video feed
+                videoFeed.src = "/video_feed"; // Start fetching the video feed
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            });
+        });
+
+        stopBtn.addEventListener("click", () => {
+            fetch('/toggle_tracking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track: false })
+            }).then(() => {
+                statusText.innerText = "Tracking stopped.";
+                statusText.style.color = "red";
+                videoFeed.src = ""; // Clear video feed to stop camera
+                videoContainer.style.display = "none"; // Hide the video container
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            });
+        });
+    </script>
+</body>
+</html>
