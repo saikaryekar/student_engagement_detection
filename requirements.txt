@@ -1,8 +1,8 @@
-tensorflow==2.19.0
-torch == 2.6.0
-opencv-python == 4.11.0
-numpy == 1.26.4
-mediapipe == 0.10.20
-flask == 3.1.0
+tensorflow>=2.11.0
+torch>=1.13.0
+opencv-python
+numpy
+mediapipe
+flask
 Werkzeug>=2.0  # Flask dependency, can help prevent version issues
-gunicorn == 22.0.0
+gunicorn >= 22.0.0
